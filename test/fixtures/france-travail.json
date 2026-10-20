@@ -1,0 +1,35 @@
+{
+  "resultats": [
+    {
+      "id": "201ABCD",
+      "intitule": "Développeur Full Stack Senior PHP/Symfony (H/F)",
+      "description": "Nous recherchons un développeur full stack senior. Stack : PHP 8, Symfony, React. 2 jours de télétravail.",
+      "dateCreation": "2026-10-12T09:15:00.000Z",
+      "lieuTravail": { "libelle": "75 - Paris 9e Arrondissement", "codePostal": "75009" },
+      "entreprise": { "nom": "Acme Santé" },
+      "typeContrat": "CDI",
+      "salaire": { "libelle": "Annuel de 60000.00 Euros à 70000.00 Euros sur 12 mois" },
+      "origineOffre": { "urlOrigine": "https://candidat.francetravail.fr/offres/recherche/detail/201ABCD" }
+    },
+    {
+      "id": "201EFGH",
+      "intitule": "Développeur Full Stack Junior (H/F)",
+      "description": "Poste junior.",
+      "dateCreation": "2026-10-12T10:00:00.000Z",
+      "lieuTravail": { "libelle": "93 - Saint-Denis" },
+      "entreprise": { "nom": "Beta Corp" },
+      "typeContrat": "CDI",
+      "salaire": { "libelle": "Annuel de 38000.00 Euros sur 12 mois" },
+      "origineOffre": {}
+    },
+    {
+      "id": "201IJKL",
+      "intitule": "Lead Developer Node.js (H/F)",
+      "description": "Lead dev pour un grand compte.",
+      "dateCreation": "2026-10-12T11:00:00.000Z",
+      "lieuTravail": { "libelle": "92 - Nanterre" },
+      "entreprise": { "nom": "Capgemini" },
+      "typeContrat": "CDI"
+    }
+  ]
+}

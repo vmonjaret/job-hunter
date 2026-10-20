@@ -1,0 +1,301 @@
+{
+  "name": "job-hunter-digest",
+  "nodes": [
+    {
+      "id": "2d923b0b-ab2b-404e-82cf-85d3778d340b",
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Every day 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "ecae1184-9d3d-67c1-9ee6-d6661b32f10d",
+      "parameters": {},
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "id": "9bbad6f8-d4fb-dcd2-27a0-e9a064278b93",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Generated from src/config.js and src/config.local.js: edit them, run npm run build:local, then re-import.\nreturn [{ json: {\n  \"sheetId\": \"<SHEET_ID>\",\n  \"sheetUrl\": \"https://docs.google.com/spreadsheets/d/<SHEET_ID>\",\n  \"digestEmail\": \"you@example.com\",\n  \"scoreThreshold\": 7\n} }];\n"
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        100
+      ]
+    },
+    {
+      "id": "a637515e-0d9e-e1fe-b995-95f7ba28752f",
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').first().json.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "offers"
+        },
+        "options": {}
+      },
+      "name": "Read Offers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d70d7e82-36b9-defb-83d3-e7dd5435cdc8",
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').first().json.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "runs"
+        },
+        "options": {}
+      },
+      "name": "Read Runs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "38f06334-201d-7cc7-3f4b-dab943b9012a",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Column order of the Google Sheet tabs. The header rows in the sheet must match exactly.\nconst OFFER_COLUMNS = [\n  'id', 'source', 'title', 'company', 'location', 'work_mode', 'contract',\n  'salary_min', 'salary_max', 'salary_raw', 'estimated_salary', 'url',\n  'published_at', 'found_at', 'score', 'score_reason', 'flags', 'status',\n  'score_attempts', 'emailed_at', 'notes', 'dedupe_key',\n];\nconst RUN_COLUMNS = ['run_at', 'source', 'fetched', 'eligible', 'error'];\n// Also the dedupe priority: when two sources have the same offer, the first one wins.\nconst SOURCES = ['france_travail', 'wttj', 'linkedin', 'adzuna', 'remotive', 'remoteok'];\n\nfunction pickColumns(row) {\n  const out = {};\n  for (const col of OFFER_COLUMNS) {\n    out[col] = row[col] === undefined || row[col] === null ? '' : row[col];\n  }\n  return out;\n}\n\nconst HTML_ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '\"', '&#39;': \"'\", '&apos;': \"'\", '&nbsp;': ' ' };\n\nfunction stripHtml(html) {\n  if (html === null || html === undefined) return '';\n  return String(html)\n    .replace(/<(br|\\/p|\\/li|\\/h[1-6]|\\/div)\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/?(b|i|u|em|strong|span|a|small|code)(\\s[^>]*)?>/gi, '')\n    .replace(/<[^>]*>/g, ' ')\n    .replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (m) => HTML_ENTITIES[m])\n    .replace(/&#(\\d+);/g, (_, code) => String.fromCharCode(Number(code)))\n    .replace(/[ \\t ]+/g, ' ')\n    .replace(/ *\\n\\s*/g, '\\n')\n    .trim();\n}\n\nfunction normalizeKey(str) {\n  return String(str || '')\n    .normalize('NFD')\n    .replace(/[̀-ͯ]/g, '')\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, ' ')\n    .trim();\n}\n\nfunction dedupeKey(company, title) {\n  const cleanTitle = String(title || '')\n    .replace(/\\(\\s*[hfmwd]\\s*(\\/\\s*[hfmwd]\\s*)*\\)/gi, ' ')\n    .replace(/\\b[hf]\\s*\\/\\s*[hf]\\b/gi, ' ');\n  const c = normalizeKey(company);\n  const t = normalizeKey(cleanTitle);\n  return c && t ? `${c}|${t}` : '';\n}\n\nfunction truncate(str, max) {\n  const s = String(str === null || str === undefined ? '' : str);\n  return s.length <= max ? s : `${s.slice(0, max)}…`;\n}\n\nfunction escapeHtml(str) {\n  return String(str === null || str === undefined ? '' : str)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&#39;');\n}\n\nfunction isWithinHours(dateish, hours, now) {\n  const t = Date.parse(dateish);\n  if (Number.isNaN(t)) return true;\n  return now.getTime() - t <= hours * 3600 * 1000;\n}\n\n// Returns a yearly { min, max } from free-text salary, or null when there is no usable yearly amount.\nfunction parseSalary(text) {\n  if (text === null || text === undefined) return null;\n  const s = String(text).toLowerCase();\n  if (!/\\d/.test(s)) return null;\n  if (/jour|journalier|\\bday\\b|daily|heure|horaire|\\bhour|hourly|\\/h\\b|tjm/.test(s)) return null;\n\n  let t = s.replace(/(\\d)[\\s  ]+(?=\\d{3}(?!\\d))/g, '$1'); // \"55 000\" -> \"55000\"\n  t = t.replace(/(\\d)[,.](?=\\d{3}(?!\\d))/g, '$1'); // \"60,000\" -> \"60000\"\n  t = t.replace(/(\\d),(\\d)/g, '$1.$2'); // \"35,3k\" -> \"35.3k\"\n\n  const values = [];\n  const re = /(\\d+(?:\\.\\d+)?)\\s*(k)?/g;\n  let m = re.exec(t);\n  while (m) {\n    let v = parseFloat(m[1]);\n    if (m[2]) v *= 1000;\n    if (v >= 1000) values.push(v);\n    m = re.exec(t);\n  }\n  if (values.length === 0) return null;\n\n  let min = Math.min(...values);\n  let max = Math.max(...values);\n  const monthly = /mensuel|par mois|\\/ ?mois|per month|\\/ ?month|monthly/.test(s);\n  if (monthly || max < 15000) {\n    min *= 12;\n    max *= 12;\n  }\n  return { min: Math.round(min), max: Math.round(max) };\n}\n\n// LinkedIn guest pages (no login): search results are <li> job cards, a job page has the full description.\nfunction firstMatch(html, regex) {\n  const m = String(html || '').match(regex);\n  return m ? stripHtml(m[1]) : '';\n}\n\nfunction parseLinkedinCards(html) {\n  return String(html || '').split('<li>').slice(1).map((card) => ({\n    id: firstMatch(card, /urn:li:jobPosting:(\\d+)/),\n    title: firstMatch(card, /base-search-card__title[^>]*>([\\s\\S]*?)<\\/h3>/),\n    company: firstMatch(card, /base-search-card__subtitle[^>]*>([\\s\\S]*?)<\\/h4>/),\n    location: firstMatch(card, /job-search-card__location[^>]*>([\\s\\S]*?)<\\/span>/),\n    published_at: firstMatch(card, /<time[^>]*datetime=\"([^\"]+)\"/),\n  })).filter((c) => c.id && c.title);\n}\n\nfunction parseLinkedinDetail(html) {\n  const criteria = {};\n  const re = /description__job-criteria-subheader[^>]*>([\\s\\S]*?)<\\/h3>\\s*<span[^>]*>([\\s\\S]*?)<\\/span>/g;\n  let m = re.exec(String(html || ''));\n  while (m) {\n    criteria[stripHtml(m[1])] = stripHtml(m[2]);\n    m = re.exec(String(html || ''));\n  }\n  return {\n    description: firstMatch(html, /show-more-less-html__markup[^>]*>([\\s\\S]*?)<\\/div>/),\n    employment_type: criteria['Employment type'] || '',\n    seniority: criteria['Seniority level'] || '',\n  };\n}\n\nfunction makeOffer(source, externalId, fields, foundAt) {\n  const offer = {\n    id: `${source}:${externalId}`,\n    source,\n    title: '',\n    company: '',\n    location: '',\n    work_mode: 'unknown',\n    contract: '',\n    salary_min: '',\n    salary_max: '',\n    salary_raw: '',\n    estimated_salary: '',\n    url: '',\n    published_at: '',\n    found_at: foundAt,\n    score: '',\n    score_reason: '',\n    flags: '',\n    status: '',\n    score_attempts: 0,\n    emailed_at: '',\n    notes: '',\n    dedupe_key: '',\n    description: '',\n    ...fields,\n  };\n  offer.title = stripHtml(offer.title);\n  offer.company = String(offer.company || '').trim();\n  offer.location = String(offer.location || '').trim();\n  offer.dedupe_key = dedupeKey(offer.company, offer.title);\n  return offer;\n}\n\nfunction salaryFields(raw) {\n  const parsed = parseSalary(raw);\n  return { salary_raw: raw || '', salary_min: parsed ? parsed.min : '', salary_max: parsed ? parsed.max : '' };\n}\n\nfunction matchesRemoteLocation(location, regexSource) {\n  const loc = String(location || '').trim();\n  if (!loc) return true;\n  return new RegExp(regexSource, 'i').test(loc);\n}\n\nfunction fromFranceTravail(raw, foundAt) {\n  return makeOffer('france_travail', raw.id, {\n    title: raw.intitule,\n    company: raw.entreprise?.nom,\n    location: raw.lieuTravail?.libelle,\n    contract: raw.typeContrat || '',\n    ...salaryFields(raw.salaire?.libelle),\n    url: raw.origineOffre?.urlOrigine || `https://candidat.francetravail.fr/offres/recherche/detail/${raw.id}`,\n    published_at: raw.dateCreation || '',\n    description: stripHtml(raw.description),\n  }, foundAt);\n}\n\nfunction fromAdzuna(raw, foundAt) {\n  const lo = Math.round(Number(raw.salary_min) || Number(raw.salary_max) || 0);\n  const hi = Math.round(Number(raw.salary_max) || lo);\n  const predicted = String(raw.salary_is_predicted) === '1';\n  let salary = {};\n  if (lo && predicted) salary = { salary_raw: `Adzuna estimate: ${lo}-${hi} EUR` };\n  else if (lo) salary = { salary_raw: `${lo}-${hi} EUR`, salary_min: lo, salary_max: hi };\n  return makeOffer('adzuna', raw.id, {\n    title: raw.title,\n    company: raw.company?.display_name,\n    location: raw.location?.display_name,\n    contract: [raw.contract_type, raw.contract_time].filter(Boolean).join(' '),\n    ...salary,\n    url: raw.redirect_url || '',\n    published_at: raw.created || '',\n    description: stripHtml(raw.description),\n  }, foundAt);\n}\n\nconst WTTJ_WORK_MODES = { fulltime: 'remote', partial: 'hybrid', punctual: 'onsite', no: 'onsite' };\n\nfunction fromWttj(hit, foundAt) {\n  const offices = Array.isArray(hit.offices) ? hit.offices : [];\n  const lo = Number(hit.salary_minimum) || Number(hit.salary_maximum) || 0;\n  const hi = Number(hit.salary_maximum) || lo;\n  const yearly = !hit.salary_period || hit.salary_period === 'yearly';\n  const salary = lo && yearly\n    ? { salary_raw: `${lo}-${hi} ${hit.salary_currency || 'EUR'}`, salary_min: lo, salary_max: hi }\n    : {};\n  const org = hit.organization || {};\n  return makeOffer('wttj', hit.reference || hit.objectID, {\n    title: hit.name,\n    company: org.name,\n    location: offices.map((o) => o.city).filter(Boolean).join(', ') || (hit.remote === 'fulltime' ? 'Remote' : ''),\n    work_mode: WTTJ_WORK_MODES[hit.remote] || 'unknown',\n    contract: hit.contract_type || '',\n    ...salary,\n    url: org.slug && hit.slug ? `https://www.welcometothejungle.com/fr/companies/${org.slug}/jobs/${hit.slug}` : '',\n    published_at: hit.published_at || '',\n    description: stripHtml([hit.summary, hit.profile].filter(Boolean).join('\\n')),\n  }, foundAt);\n}\n\n// Remotive dates have no timezone; they are UTC.\nfunction remotiveDate(job) {\n  const d = job.publication_date || '';\n  return d && !/(z|[+-]\\d\\d:?\\d\\d)$/i.test(d) ? `${d}Z` : d;\n}\n\nfunction fromRemotive(job, foundAt) {\n  return makeOffer('remotive', job.id, {\n    title: job.title,\n    company: job.company_name,\n    location: job.candidate_required_location,\n    work_mode: 'remote',\n    contract: job.job_type || '',\n    ...salaryFields(job.salary),\n    url: job.url || '',\n    published_at: remotiveDate(job),\n    description: stripHtml(job.description),\n  }, foundAt);\n}\n\nfunction fromRemoteOk(job, foundAt) {\n  const lo = Number(job.salary_min) || 0;\n  const hi = Number(job.salary_max) || lo;\n  const salary = lo ? { salary_raw: `${lo}-${hi} USD`, salary_min: lo, salary_max: hi } : {};\n  return makeOffer('remoteok', job.id, {\n    title: job.position,\n    company: job.company,\n    location: job.location || 'Remote',\n    work_mode: 'remote',\n    ...salary,\n    url: job.url || job.apply_url || '',\n    published_at: job.date || '',\n    description: stripHtml(job.description),\n  }, foundAt);\n}\n\nconst MAPPERS = {\n  france_travail: fromFranceTravail,\n  adzuna: fromAdzuna,\n  wttj: fromWttj,\n  remotive: fromRemotive,\n  remoteok: fromRemoteOk,\n};\n\nfunction isEligible(source, raw, config, now) {\n  const hours = config.windowHours;\n  if (source === 'wttj') {\n    const offices = Array.isArray(raw.offices) ? raw.offices : [];\n    return raw.contract_type === 'full_time'\n      && (raw.remote === 'fulltime' || offices.some((o) => o.country_code === 'FR'))\n      && isWithinHours(raw.published_at, hours.wttj, now);\n  }\n  if (source === 'remotive') {\n    return raw.category === 'Software Development'\n      && matchesRemoteLocation(raw.candidate_required_location, config.remoteLocationRegex)\n      && isWithinHours(remotiveDate(raw), hours.remotive, now);\n  }\n  if (source === 'remoteok') {\n    const tags = (Array.isArray(raw.tags) ? raw.tags : []).map((t) => String(t).toLowerCase());\n    return config.remoteTags.some((t) => tags.includes(t))\n      && matchesRemoteLocation(raw.location, config.remoteLocationRegex)\n      && isWithinHours(raw.date, hours.remoteok, now);\n  }\n  return true;\n}\n\nfunction extractRaw(source, response) {\n  if (source === 'france_travail') return Array.isArray(response.resultats) ? response.resultats : [];\n  if (source === 'adzuna') return Array.isArray(response.results) ? response.results : [];\n  if (source === 'wttj') {\n    const results = Array.isArray(response.results) ? response.results : [];\n    return results.flatMap((r) => (Array.isArray(r.hits) ? r.hits : []));\n  }\n  if (source === 'remotive') return Array.isArray(response.jobs) ? response.jobs : [];\n  if (source === 'remoteok') {\n    // n8n splits a top-level JSON array into one item per element; accept both shapes.\n    return (Array.isArray(response) ? response : [response]).filter((j) => j && j.id && j.position);\n  }\n  throw new Error(`Unknown source: ${source}`);\n}\n\nfunction responseError(response) {\n  if (!response || typeof response !== 'object') return 'empty response';\n  if (!response.error) return '';\n  if (typeof response.error === 'string') return response.error;\n  // Some n8n errors (e.g. a failed OAuth2 token request) reach the item without a message.\n  return response.error.message || response.error.description || 'request failed (n8n recorded no details, open the execution to see the node error)';\n}\n\n// The WTTJ website publishes its public Algolia keys at /api/env as `window.env = {...};`.\nfunction parseWttjEnv(text) {\n  const read = (name) => {\n    const m = String(text || '').match(new RegExp(`\"${name}\"\\\\s*:\\\\s*\"([^\"]+)\"`));\n    return m ? m[1] : '';\n  };\n  return { appId: read('PUBLIC_ALGOLIA_APPLICATION_ID'), apiKey: read('PUBLIC_ALGOLIA_API_KEY_CLIENT') };\n}\n\nfunction normalizeResponses(source, responses, config, now) {\n  const offers = [];\n  if (source === 'wttj' && !(config.wttj && config.wttj.appId && config.wttj.apiKey && config.wttj.indexName)) {\n    return { offers, status: { source, fetched: 0, eligible: 0, error: 'no Algolia keys (could not read welcometothejungle.com/api/env)' } };\n  }\n  const foundAt = now.toISOString();\n  const errors = [];\n  const seen = new Set();\n  let fetched = 0;\n  for (const response of responses) {\n    const error = responseError(response);\n    if (error) {\n      errors.push(error);\n      continue;\n    }\n    for (const raw of extractRaw(source, response)) {\n      fetched += 1;\n      if (!isEligible(source, raw, config, now)) continue;\n      const offer = MAPPERS[source](raw, foundAt);\n      if (!offer.title || !offer.url || seen.has(offer.id)) continue;\n      seen.add(offer.id);\n      offers.push(offer);\n    }\n  }\n  return { offers, status: { source, fetched, eligible: offers.length, error: sourceError(errors) } };\n}\nfunction linkedinCardOffer(card, foundAt) {\n  return makeOffer('linkedin', card.id, {\n    title: card.title,\n    company: card.company,\n    location: card.location,\n    url: `https://www.linkedin.com/jobs/view/${card.id}/`,\n    published_at: card.published_at || '',\n  }, foundAt);\n}\n\nfunction sourceError(errors) {\n  if (errors.length === 0) return '';\n  return errors.length === 1 ? errors[0] : `${errors.length} requests failed: ${errors[0]}`;\n}\n\n// picks[i] is the search card whose job page is detailResponses[i]. Failed pages are left out, so the next run retries them.\nfunction normalizeLinkedin(searchResponses, picks, detailResponses, now) {\n  const foundAt = now.toISOString();\n  const errors = searchResponses.map(responseError).filter(Boolean);\n  const ids = new Set(searchResponses.flatMap((r) => parseLinkedinCards(r && r.data).map((c) => c.id)));\n  const offers = [];\n  picks.forEach((card, i) => {\n    const response = detailResponses[i];\n    const error = responseError(response);\n    const detail = error ? null : parseLinkedinDetail(response.data);\n    if (!detail || !detail.description) {\n      errors.push(error || 'job page without description');\n      return;\n    }\n    // The search's full-time filter still lets some part-time and contract offers through.\n    if (detail.employment_type && detail.employment_type !== 'Full-time') return;\n    offers.push({ ...linkedinCardOffer(card, foundAt), contract: detail.employment_type, description: detail.description });\n  });\n  return { offers, status: { source: 'linkedin', fetched: ids.size, eligible: offers.length, error: sourceError(errors) } };\n}\n\nfunction dedupe(offers, existingRows) {\n  const ids = new Set(existingRows.filter((r) => r.id).map((r) => String(r.id)));\n  const keys = new Set(existingRows.map((r) => r.dedupe_key).filter(Boolean));\n  const out = [];\n  for (const offer of offers) {\n    if (ids.has(offer.id)) continue;\n    if (offer.dedupe_key && keys.has(offer.dedupe_key)) continue;\n    ids.add(offer.id);\n    if (offer.dedupe_key) keys.add(offer.dedupe_key);\n    out.push(offer);\n  }\n  return out;\n}\n\nfunction prefilterReason(offer, config) {\n  if (!new RegExp(config.titleIncludeRegex, 'i').test(offer.title)) return 'title not matching';\n  if (new RegExp(config.titleExcludeRegex, 'i').test(offer.title)) return 'title excluded';\n  const company = ` ${normalizeKey(offer.company)} `;\n  const esn = config.esnBlocklist.find((name) => company.includes(` ${normalizeKey(name)} `));\n  if (esn) return `ESN: ${esn}`;\n  const max = offer.salary_max;\n  if (max !== '' && max !== null && max !== undefined && Number(max) < config.salaryFloor) return 'salary below floor';\n  return '';\n}\n\nfunction prefilter(offers, config) {\n  const kept = [];\n  const dropped = [];\n  for (const offer of offers) {\n    const reason = prefilterReason(offer, config);\n    if (reason) dropped.push({ offer, reason });\n    else kept.push(offer);\n  }\n  return { kept, dropped };\n}\n\nconst SCORE_FLAGS = ['esn', 'avoided_language', 'contractor_only', 'salary_below_floor', 'onsite_only', 'far_commute', 'not_senior', 'not_cdi'];\nconst WORK_MODES = ['onsite', 'hybrid', 'remote', 'unknown'];\n\n// Structured outputs don't support numeric constraints; the 0-10 range is checked in parseScoringResponse.\nconst SCORING_SCHEMA = {\n  type: 'object',\n  additionalProperties: false,\n  required: ['score', 'reason', 'flags', 'work_mode', 'estimated_salary'],\n  properties: {\n    score: { type: 'integer', description: 'Match score from 0 (no fit) to 10 (perfect fit)' },\n    reason: { type: 'string' },\n    flags: { type: 'array', items: { type: 'string', enum: SCORE_FLAGS } },\n    work_mode: { type: 'string', enum: WORK_MODES },\n    estimated_salary: { anyOf: [{ type: 'string' }, { type: 'null' }] },\n  },\n};\n\nfunction buildUserMessage(row, description, maxChars) {\n  return [\n    `Title: ${row.title}`,\n    `Company: ${row.company || '(not specified)'}`,\n    `Location: ${row.location || '(not specified)'}`,\n    `Work mode (from the job board): ${row.work_mode || 'unknown'}`,\n    `Contract: ${row.contract || '(not specified)'}`,\n    `Salary: ${row.salary_raw || '(not specified)'}`,\n    `Source: ${row.source}`,\n    '',\n    description\n      ? `Description:\\n${truncate(description, maxChars)}`\n      : 'Description: (not available, score from the fields above only)',\n  ].join('\\n');\n}\n\nfunction buildScoringRequest(row, description, config) {\n  return {\n    model: config.claudeModel,\n    max_tokens: config.claudeMaxTokens,\n    system: config.systemPrompt,\n    messages: [{ role: 'user', content: buildUserMessage(row, description, config.descriptionMaxChars) }],\n    output_config: { effort: config.claudeEffort, format: { type: 'json_schema', schema: SCORING_SCHEMA } },\n    fallbacks: 'default',\n  };\n}\n\nfunction parseScoringResponse(response) {\n  if (!response || typeof response !== 'object') return { ok: false, error: 'empty response' };\n  if (response.error) {\n    return { ok: false, error: typeof response.error === 'string' ? response.error : response.error.message || 'API error' };\n  }\n  if (response.stop_reason !== 'end_turn') return { ok: false, error: `stop_reason ${response.stop_reason}` };\n  const block = (response.content || []).find((b) => b.type === 'text');\n  if (!block) return { ok: false, error: 'no text block' };\n  let data;\n  try {\n    data = JSON.parse(block.text);\n  } catch (e) {\n    return { ok: false, error: 'invalid JSON' };\n  }\n  const score = Number(data.score);\n  if (!Number.isInteger(score) || score < 0 || score > 10) return { ok: false, error: `invalid score ${data.score}` };\n  return {\n    ok: true,\n    score,\n    reason: truncate(String(data.reason || ''), 200),\n    flags: Array.isArray(data.flags) ? data.flags.filter((f) => SCORE_FLAGS.includes(f)) : [],\n    work_mode: WORK_MODES.includes(data.work_mode) ? data.work_mode : 'unknown',\n    estimated_salary: typeof data.estimated_salary === 'string' ? data.estimated_salary : '',\n  };\n}\n\n// LinkedIn job pages are fetched one by one and get rate-limited, so only fetch new cards that pass the pre-filter.\nfunction pickLinkedinCards(searchResponses, existingRows, config, now) {\n  const cards = new Map();\n  for (const response of searchResponses) {\n    for (const card of parseLinkedinCards(response && response.data)) {\n      if (!cards.has(card.id)) cards.set(card.id, card);\n    }\n  }\n  const offers = [...cards.values()].map((card) => linkedinCardOffer(card, now.toISOString()));\n  const { kept } = prefilter(dedupe(offers, existingRows.filter((r) => r && r.id)), config);\n  return kept.slice(0, config.linkedinMaxDetails).map((o) => cards.get(o.id.slice('linkedin:'.length)));\n}\n\nfunction prepareCollectorRun(fetched, existingRows, config) {\n  const rows = existingRows.filter((r) => r && r.id);\n  const offers = fetched.filter((f) => !f._status && f.id);\n  const retryRows = rows.filter((r) => r.status === 'to_score').slice(0, config.maxRetryRows);\n  const { kept } = prefilter(dedupe(offers, rows), config);\n  const items = [];\n  for (const existing of retryRows) {\n    const row = pickColumns(existing);\n    items.push({ op: 'update', row, noDescription: true, claudeRequest: buildScoringRequest(row, '', config) });\n  }\n  for (const offer of kept) {\n    const row = pickColumns({ ...offer, status: 'to_score', score_attempts: 0 });\n    items.push({\n      op: 'append',\n      row,\n      noDescription: !offer.description,\n      claudeRequest: buildScoringRequest(row, offer.description, config),\n    });\n  }\n  return items;\n}\n\nfunction applyScores(prepared, responses, config) {\n  if (prepared.length !== responses.length) {\n    throw new Error(`Scoring mismatch: ${prepared.length} prepared items but ${responses.length} responses`);\n  }\n  return prepared.map((item, i) => {\n    const result = parseScoringResponse(responses[i]);\n    const attempts = (Number(item.row.score_attempts) || 0) + 1;\n    const row = { ...item.row, score_attempts: attempts };\n    if (result.ok) {\n      Object.assign(row, {\n        score: result.score,\n        score_reason: item.noDescription ? `${result.reason} (scored without description)` : result.reason,\n        flags: result.flags.join(','),\n        work_mode: result.work_mode === 'unknown' ? row.work_mode : result.work_mode,\n        estimated_salary: result.estimated_salary,\n        status: 'new',\n      });\n    } else {\n      Object.assign(row, {\n        score: '',\n        score_reason: `scoring failed: ${result.error}`,\n        status: attempts >= config.maxScoreAttempts ? 'score_failed' : 'to_score',\n      });\n    }\n    return { op: item.op, row };\n  });\n}\n\nfunction buildRunLog(fetched, now) {\n  const runAt = now.toISOString();\n  return fetched\n    .filter((f) => f._status)\n    .map((f) => ({ run_at: runAt, source: f._status.source, fetched: f._status.fetched, eligible: f._status.eligible, error: f._status.error }));\n}\n\nconst SOURCE_LABELS = {\n  france_travail: 'France Travail',\n  wttj: 'Welcome to the Jungle',\n  linkedin: 'LinkedIn',\n  adzuna: 'Adzuna',\n  remotive: 'Remotive',\n  remoteok: 'Remote OK',\n};\nconst DAY_MS = 24 * 3600 * 1000;\n\nfunction hasScore(row) {\n  return row.score !== '' && row.score !== null && row.score !== undefined;\n}\n\nfunction selectDigestRows(rows, threshold) {\n  return rows\n    .filter((r) => r.status === 'new' && hasScore(r) && Number(r.score) >= threshold)\n    .sort((a, b) => Number(b.score) - Number(a.score)\n      || (Date.parse(b.published_at) || 0) - (Date.parse(a.published_at) || 0));\n}\n\nfunction isRecent(dateish, now) {\n  return now.getTime() - Date.parse(dateish) <= DAY_MS;\n}\n\nfunction sourceHealth(runs, now, sources = SOURCES) {\n  const recent = runs.filter((r) => isRecent(r.run_at, now));\n  return sources.map((source) => {\n    const mine = recent.filter((r) => r.source === source);\n    const fetched = mine.reduce((sum, r) => sum + (Number(r.fetched) || 0), 0);\n    const errors = mine.filter((r) => r.error).map((r) => String(r.error));\n    return {\n      source,\n      label: SOURCE_LABELS[source],\n      runs: mine.length,\n      fetched,\n      lastError: errors.length ? errors[errors.length - 1] : '',\n      ok: mine.length > 0 && fetched > 0 && errors.length === 0,\n    };\n  });\n}\n\nfunction recentStats(rows, now) {\n  const recent = rows.filter((r) => isRecent(r.found_at, now));\n  return { collected: recent.length, scored: recent.filter(hasScore).length };\n}\n\nfunction digestSubject(count, now) {\n  const date = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit' }).format(now);\n  return `🎯 Job digest: ${count} new match${count === 1 ? '' : 'es'} (${date})`;\n}\n\nfunction safeUrl(url) {\n  return /^https?:\\/\\//i.test(String(url || '')) ? String(url) : '#';\n}\n\nfunction scoreColor(score) {\n  if (score >= 9) return '#15803d';\n  if (score >= 8) return '#2563eb';\n  return '#a16207';\n}\n\nfunction renderOfferCard(row) {\n  const score = Number(row.score);\n  let salary = 'not specified';\n  if (row.salary_raw) salary = row.salary_raw;\n  else if (row.estimated_salary) salary = `~${row.estimated_salary} (estimated)`;\n  const flags = String(row.flags || '').split(',').filter(Boolean)\n    .map((f) => `<span style=\"display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:8px;background:#fee2e2;color:#991b1b;font-size:12px\">${escapeHtml(f)}</span>`)\n    .join('');\n  const company = row.company ? ` <span style=\"color:#6b7280;font-weight:400\">@ ${escapeHtml(row.company)}</span>` : '';\n  return `<div style=\"border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin:0 0 12px\">\n<div style=\"font-size:16px;font-weight:600\"><span style=\"display:inline-block;min-width:28px;padding:2px 8px;margin-right:8px;border-radius:12px;background:${scoreColor(score)};color:#fff;text-align:center\">${score}</span>${escapeHtml(row.title)}${company}</div>\n<div style=\"color:#374151;font-size:13px;margin-top:6px\">📍 ${escapeHtml(row.location || 'unknown')} · ${escapeHtml(row.work_mode || 'unknown')} · 💶 ${escapeHtml(salary)} · ${escapeHtml(SOURCE_LABELS[row.source] || row.source)}</div>\n<div style=\"font-size:14px;margin-top:8px\">${escapeHtml(row.score_reason)}</div>\n${flags ? `<div style=\"margin-top:6px\">${flags}</div>` : ''}\n<div style=\"margin-top:10px\"><a href=\"${escapeHtml(safeUrl(row.url))}\" style=\"color:#2563eb;font-weight:600\">Open offer →</a></div>\n</div>`;\n}\n\nfunction healthLine(h) {\n  if (h.runs === 0) return `⚠️ ${escapeHtml(h.label)}: no runs logged in 24h`;\n  if (h.lastError) return `⚠️ ${escapeHtml(h.label)}: error: ${escapeHtml(h.lastError)}`;\n  return `⚠️ ${escapeHtml(h.label)}: no results in 24h, check the source`;\n}\n\nfunction renderDigestHtml(selected, health, stats, config) {\n  const count = selected.length;\n  const cards = selected.map(renderOfferCard).join('\\n');\n  const warnings = health.filter((h) => !h.ok).map((h) => `<li>${healthLine(h)}</li>`).join('');\n  const perSource = health.map((h) => `${escapeHtml(h.label)} ${h.fetched}`).join(' · ');\n  const sheetLink = config.sheetUrl ? `<p><a href=\"${escapeHtml(safeUrl(config.sheetUrl))}\">Open the tracker sheet</a></p>` : '';\n  const remoteOk = selected.some((r) => r.source === 'remoteok') ? '<p>Jobs via <a href=\"https://remoteok.com\">Remote OK</a>.</p>' : '';\n  const remotive = selected.some((r) => r.source === 'remotive') ? '<p>Jobs via <a href=\"https://remotive.com\">Remotive</a>.</p>' : '';\n  return `<div style=\"font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;color:#111827\">\n<h2 style=\"margin:0 0 16px\">${count} new match${count === 1 ? '' : 'es'}</h2>\n${cards}\n<div style=\"color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;margin-top:20px;padding-top:12px\">\n<p>Last 24h: ${stats.collected} offers saved to the sheet, ${stats.scored} scored, ${count} shown (score ≥ ${config.scoreThreshold}).</p>\n<p>Fetched per source: ${perSource}</p>\n${warnings ? `<ul style=\"padding-left:18px\">${warnings}</ul>` : ''}\n${sheetLink}${remoteOk}${remotive}\n</div>\n</div>`;\n}\n\nfunction buildDigest(rows, runs, config, now) {\n  const selected = selectDigestRows(rows, config.scoreThreshold);\n  if (selected.length === 0) return null;\n  return {\n    subject: digestSubject(selected.length, now),\n    html: renderDigestHtml(selected, sourceHealth(runs, now, config.enabledSources), recentStats(rows, now), config),\n    ids: selected.map((r) => String(r.id)),\n  };\n}\n\nfunction formatErrorEmail(errorData, to) {\n  const workflow = (errorData && errorData.workflow) || {};\n  const execution = (errorData && errorData.execution) || {};\n  const error = execution.error || {};\n  const name = workflow.name || 'unknown workflow';\n  const link = execution.url ? `<p><a href=\"${escapeHtml(safeUrl(execution.url))}\">Open the execution</a></p>` : '';\n  return {\n    to,\n    subject: `⚠️ n8n job hunter: ${name} failed`,\n    html: `<p><b>Workflow:</b> ${escapeHtml(name)}</p>\n<p><b>Failed node:</b> ${escapeHtml(execution.lastNodeExecuted || 'unknown')}</p>\n<p><b>Error:</b> ${escapeHtml(error.message || 'unknown error')}</p>\n${link}`,\n  };\n}\n\n// ---- node entry ----\nconst config = $('Config').first().json;\nconst offers = $('Read Offers').all().map((i) => i.json).filter((r) => r.id);\nconst runs = $input.all().map((i) => i.json).filter((r) => r.run_at);\nconst digest = buildDigest(offers, runs, config, new Date());\nreturn digest ? [{ json: digest }] : [];\n"
+      },
+      "name": "Build Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ]
+    },
+    {
+      "id": "87d8048f-58ae-205f-a4f6-999c2356bc29",
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Config').first().json.digestEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Send Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        100
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "b830986e-17c6-dd58-3827-f8064ac10202",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const { ids } = $('Build Digest').first().json;\nconst emailedAt = new Date().toISOString();\nreturn ids.map((id) => ({ json: { id, status: 'emailed', emailed_at: emailedAt } }));\n"
+      },
+      "name": "Mark Emailed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "id": "e6b502d4-7269-914c-03a2-7b91bb42d04b",
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').first().json.sheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "offers"
+        },
+        "options": {
+          "cellFormat": "RAW"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": []
+        }
+      },
+      "name": "Update Offers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every day 08:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Offers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Offers": {
+      "main": [
+        [
+          {
+            "node": "Read Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Runs": {
+      "main": [
+        [
+          {
+            "node": "Build Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest": {
+      "main": [
+        [
+          {
+            "node": "Send Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Digest": {
+      "main": [
+        [
+          {
+            "node": "Mark Emailed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Emailed": {
+      "main": [
+        [
+          {
+            "node": "Update Offers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris",
+    "saveManualExecutions": true
+  },
+  "pinData": {}
+}

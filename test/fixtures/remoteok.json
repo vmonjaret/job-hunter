@@ -1,0 +1,34 @@
+[
+  {
+    "last_updated": 1791878411,
+    "legal": "API Terms of Service: Please link back to the URL on Remote OK and mention Remote OK as a source."
+  },
+  {
+    "slug": "remote-senior-full-stack-engineer-kappa-1137500",
+    "id": "1137500",
+    "epoch": 1791800000,
+    "date": "2026-10-12T10:00:00+00:00",
+    "company": "Kappa",
+    "position": "Senior Full Stack Engineer",
+    "tags": ["php", "react", "senior"],
+    "description": "<p>PHP and React.</p>",
+    "location": "Europe",
+    "salary_min": 90000,
+    "salary_max": 120000,
+    "url": "https://remoteOK.com/remote-jobs/remote-senior-full-stack-engineer-kappa-1137500"
+  },
+  {
+    "slug": "remote-senior-sales-executive-1137498",
+    "id": "1137498",
+    "epoch": 1791763204,
+    "date": "2026-10-12T00:00:04+00:00",
+    "company": "SimSpace Corporation",
+    "position": "Senior Sales Executive Central Region",
+    "tags": ["sales", "senior"],
+    "description": "<p>Sales.</p>",
+    "location": "",
+    "salary_min": 145000,
+    "salary_max": 220000,
+    "url": "https://remoteOK.com/remote-jobs/remote-senior-sales-executive-1137498"
+  }
+]

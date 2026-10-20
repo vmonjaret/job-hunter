@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+.superpowers/
+# Personal settings and the workflows built from them (npm run build:local)
+src/config.local.js
+prompts/candidate-profile.md
+dist/

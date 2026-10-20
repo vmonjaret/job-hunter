@@ -1,0 +1,46 @@
+{
+  "results": [
+    {
+      "hits": [
+        {
+          "objectID": "obj-1",
+          "reference": "WTTJ-REF-1",
+          "name": "Senior Fullstack Engineer (React / Node.js)",
+          "slug": "senior-fullstack-engineer_paris",
+          "organization": { "name": "Delta Health", "slug": "delta-health" },
+          "offices": [{ "city": "Paris", "country_code": "FR" }],
+          "contract_type": "full_time",
+          "remote": "partial",
+          "salary_minimum": 65000,
+          "salary_maximum": 80000,
+          "salary_period": "yearly",
+          "salary_currency": "EUR",
+          "published_at": "2026-10-12T14:00:00Z",
+          "summary": "Event-driven architecture with Kafka."
+        },
+        {
+          "objectID": "obj-2",
+          "reference": "WTTJ-REF-2",
+          "name": "Lead Developer PHP",
+          "slug": "lead-developer-php_lyon",
+          "organization": { "name": "Epsilon", "slug": "epsilon" },
+          "offices": [{ "city": "Lyon", "country_code": "FR" }],
+          "contract_type": "internship",
+          "remote": "no",
+          "published_at": "2026-10-12T14:00:00Z"
+        },
+        {
+          "objectID": "obj-3",
+          "reference": "WTTJ-REF-3",
+          "name": "Senior Backend Engineer",
+          "slug": "senior-backend-engineer",
+          "organization": { "name": "Zeta", "slug": "zeta" },
+          "offices": [{ "city": "Paris", "country_code": "FR" }],
+          "contract_type": "full_time",
+          "remote": "fulltime",
+          "published_at": "2026-10-01T09:00:00Z"
+        }
+      ]
+    }
+  ]
+}

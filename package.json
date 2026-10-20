@@ -1,0 +1,14 @@
+{
+  "name": "n8n-job-hunter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "n8n workflows that collect, score and email job offers",
+  "scripts": {
+    "test": "node --test",
+    "build": "node build/build.js",
+    "build:local": "node build/build.js --local"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

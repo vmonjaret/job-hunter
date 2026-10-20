@@ -1,0 +1,25 @@
+# n8n for the job hunter. Start with `podman compose up -d`, then open http://localhost:5678.
+services:
+  n8n:
+    image: docker.io/n8nio/n8n:2.43.4
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      # The workflows run on Europe/Paris time (cron 07:00, 11:00, 15:00, 19:00 and digest at 08:00).
+      GENERIC_TIMEZONE: Europe/Paris
+      TZ: Europe/Paris
+      # OAuth2 callbacks (Google Sheets, Gmail) redirect here.
+      N8N_EDITOR_BASE_URL: http://localhost:5678/
+      N8N_WEBHOOK_URL: http://localhost:5678/
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+    volumes:
+      # Database, credentials and the encryption key. Back this volume up.
+      - n8n_data:/home/node/.n8n
+      # Your workflows from `npm run build:local`, for `n8n import:workflow` from inside the container.
+      - ./dist/workflows:/workflows:ro,z
+
+volumes:
+  n8n_data:

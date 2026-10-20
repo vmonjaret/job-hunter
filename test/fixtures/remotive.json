@@ -1,0 +1,44 @@
+{
+  "job-count": 3,
+  "jobs": [
+    {
+      "id": 1680001,
+      "url": "https://remotive.com/remote-jobs/software-dev/senior-react-full-stack-developer-1680001",
+      "title": "Senior React Full-stack Developer",
+      "company_name": "Eta Labs",
+      "category": "Software Development",
+      "tags": ["react", "node"],
+      "job_type": "full_time",
+      "publication_date": "2026-10-11T20:17:27",
+      "candidate_required_location": "Europe",
+      "salary": "€70k - €85k",
+      "description": "<p>Build our <b>product</b>.</p>"
+    },
+    {
+      "id": 1680002,
+      "url": "https://remotive.com/remote-jobs/marketing/remote-office-assistant-1680002",
+      "title": "Remote Office Assistant",
+      "company_name": "Theta",
+      "category": "Marketing",
+      "tags": [],
+      "job_type": "full_time",
+      "publication_date": "2026-10-11T20:17:27",
+      "candidate_required_location": "Worldwide",
+      "salary": "$35,3k- $52k",
+      "description": ""
+    },
+    {
+      "id": 1680003,
+      "url": "https://remotive.com/remote-jobs/software-dev/senior-node-engineer-1680003",
+      "title": "Senior Node Engineer",
+      "company_name": "Iota",
+      "category": "Software Development",
+      "tags": ["node"],
+      "job_type": "full_time",
+      "publication_date": "2026-10-12T08:00:00",
+      "candidate_required_location": "USA Only",
+      "salary": "",
+      "description": ""
+    }
+  ]
+}

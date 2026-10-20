@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "id": "4870000001",
+      "title": "<strong>Tech Lead</strong> Symfony",
+      "description": "Product company, Kafka, DDD.",
+      "created": "2026-10-12T08:00:00Z",
+      "redirect_url": "https://www.adzuna.fr/details/4870000001",
+      "company": { "display_name": "Gamma Software" },
+      "location": { "display_name": "Paris, Ile-de-France" },
+      "salary_min": 65000,
+      "salary_max": 75000,
+      "salary_is_predicted": "0",
+      "contract_type": "permanent",
+      "contract_time": "full_time"
+    },
+    {
+      "id": "4870000002",
+      "title": "Développeur Full Stack Senior PHP/Symfony H/F",
+      "description": "Same offer, cross-posted.",
+      "created": "2026-10-12T09:30:00Z",
+      "redirect_url": "https://www.adzuna.fr/details/4870000002",
+      "company": { "display_name": "Acme Santé" },
+      "location": { "display_name": "Paris" },
+      "salary_min": 52000,
+      "salary_max": 52000,
+      "salary_is_predicted": "1",
+      "contract_type": "permanent"
+    }
+  ]
+}

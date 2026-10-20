@@ -14,13 +14,18 @@ The `status` column in the `offers` tab is yours to edit: `new` → `emailed` �
 
 ## Setup
 
-### 0. Run n8n (Podman)
+### 0. Run n8n
+Works with Docker or Podman — replace `docker` with `podman` if you use Podman.
 ```bash
-podman compose up -d        # n8n on http://localhost:5678, Europe/Paris time
-podman compose logs -f n8n  # follow logs
-podman compose down         # stop (data stays in the n8n_data volume)
+docker compose up -d        # n8n on http://localhost:5678, Europe/Paris time
+docker compose logs -f n8n  # follow logs
+docker compose down         # stop (data stays in the n8n_data volume)
 ```
-Open http://localhost:5678 and create the owner account. The workflows only run while the container is up, so keep the machine on at 07:00–19:00. Podman has no daemon: to restart the container after a reboot, run `systemctl --user enable --now podman-restart.service` (`restart: unless-stopped` then takes effect). To upgrade n8n, change the image tag in `compose.yaml` and run `podman compose up -d`.
+Open http://localhost:5678 and create the owner account. The workflows only run while the container is up, so keep the machine on at 07:00–19:00.
+
+**Podman only:** to restart the container after a reboot, run `systemctl --user enable --now podman-restart.service` (`restart: unless-stopped` then takes effect).
+
+To upgrade n8n, change the image tag in `compose.yaml` and run `docker compose up -d`.
 
 ### 1. Google Sheet
 1. Create a spreadsheet named "Job Hunter" with two tabs: `offers` and `runs`.
@@ -60,10 +65,30 @@ Create these credentials in n8n. **The names must match exactly.**
 | `Gmail account` | Gmail OAuth2 API | Connect your Google account |
 
 ### 5. Import the workflows
-1. Import `dist/workflows/job-hunter-error-handler.json`, then `job-hunter-collector.json`, then `job-hunter-digest.json` (Workflows → Import from file). Or import all three at once from the CLI: `podman exec n8n n8n import:workflow --separate --input=/workflows`. Use the CLI only for the first import: the workflows have no fixed ID, so running it again creates duplicates.
-2. In each workflow, open every node showing a credential warning and select the credential with the matching name.
-3. In the collector and the digest: Settings → Error workflow → `job-hunter-error-handler`.
-4. Run the collector manually once (see "Checks" below), then the digest. When both look right, activate all three workflows.
+
+**Quickest path** — `setup.sh` handles steps 3 + 5 in one shot (runs the build, starts n8n, then imports):
+```bash
+./setup.sh
+```
+
+**Manual path** — build first, then either:
+- UI: Workflows → Import from file → pick `dist/workflows/job-hunter-error-handler.json`, then `job-hunter-collector.json`, then `job-hunter-digest.json`.
+- CLI (Docker): copy the files into the container and import them:
+  ```bash
+  # dist/workflows/ is already mounted at /workflows inside the container (see compose.yaml),
+  # so just run the import directly:
+  docker exec n8n n8n import:workflow --input=/workflows/job-hunter-error-handler.json
+  docker exec n8n n8n import:workflow --input=/workflows/job-hunter-collector.json
+  docker exec n8n n8n import:workflow --input=/workflows/job-hunter-digest.json
+  ```
+  Or import all three at once: `docker exec n8n n8n import:workflow --separate --input=/workflows`
+
+> **Do not re-import over existing workflows.** The workflows have no fixed ID, so running the import again creates duplicates. To update an existing workflow, import it and manually replace the existing one in the n8n UI.
+
+After importing:
+1. In each workflow, open every node showing a credential warning and select the credential with the matching name.
+2. In the collector and the digest: Settings → Error workflow → `job-hunter-error-handler`.
+3. Run the collector manually once (see "Checks" below), then the digest. When both look right, activate all three workflows.
 
 ## Changing settings
 
